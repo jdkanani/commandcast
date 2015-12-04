@@ -2,12 +2,12 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/fatih/color"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -16,60 +16,6 @@ import (
 // Colors
 var labelColor = color.New(color.FgMagenta).Add(color.Bold).SprintFunc()
 var hostColor = color.New(color.FgCyan).SprintFunc()
-
-// Host configure
-type HostConfig struct {
-	Host         string
-	User         string
-	Timeout      int
-	ClientConfig *ssh.ClientConfig
-	Session      *ssh.Session
-}
-
-// Start SSH session
-func (this *HostConfig) StartSession() (*ssh.Session, error) {
-	conn, err := ssh.Dial("tcp", this.Host+":22", this.ClientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	this.Session, err = conn.NewSession()
-	if err != nil {
-		return nil, err
-	}
-	return this.Session, err
-}
-
-// Stop SSH session
-func (this *HostConfig) StopSession() {
-	if this.Session != nil {
-		this.Session.Close()
-	}
-}
-
-// Execute command
-func (this *HostConfig) ExecuteCmd(cmd string) string {
-	if this.Session == nil {
-		if _, err := this.StartSession(); err != nil {
-			return fmt.Sprintf("%s > %s\n%s\n", hostColor(this.String()), cmd, err.Error())
-		}
-	}
-
-	var stdoutBuf bytes.Buffer
-	this.Session.Stdout = &stdoutBuf
-	this.Session.Run(cmd)
-
-	result := CleanText(stdoutBuf.String())
-	if result != "" {
-		return fmt.Sprintf("%s > %s\n%s\n", hostColor(this.String()), cmd, result)
-	}
-	return ""
-}
-
-// To string
-func (this HostConfig) String() string {
-	return this.User + "@" + this.Host
-}
 
 // Clean command - trim space and new line
 func CleanText(cmd string) string {
@@ -125,7 +71,14 @@ func Execute(cmd string, hosts []HostConfig, to int) {
 	// Execute command on hosts
 	for _, host := range hosts {
 		go func(host HostConfig) {
-			results <- host.ExecuteCmd(cmd)
+			var result string
+
+			if text, err := host.ExecuteCmd(cmd); err != nil {
+				result = err.Error()
+			} else {
+				result = text
+			}
+			results <- fmt.Sprintf("%s > %s\n%s\n", hostColor(host), cmd, result)
 		}(host)
 	}
 
@@ -217,18 +170,30 @@ func main() {
 
 				hostConfigs := make([]HostConfig, len(hosts))
 				for i, hostName := range hosts {
+					urlInfo, err := url.Parse("ssh://" + hostName)
+					if err != nil || urlInfo.Host == "" {
+						continue
+					}
+
 					// client config
-					config := &ssh.ClientConfig{
-						User: user,
-						Auth: authKeys,
+					username := user
+					password := ""
+					if urlInfo.User != nil {
+						if urlInfo.User.Username() != "" {
+							username = urlInfo.User.Username()
+						}
+						if pass, ok := urlInfo.User.Password(); ok {
+							password = pass
+						}
 					}
 
 					// create new host config
 					hostConfigs[i] = HostConfig{
-						User:         user,
-						Host:         hostName,
+						User:         username,
+						Password:     password,
+						Host:         urlInfo.Host,
 						Timeout:      to,
-						ClientConfig: config,
+						ClientConfig: &ssh.ClientConfig{User: username, Auth: authKeys},
 					}
 				}
 
