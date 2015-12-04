@@ -62,6 +62,25 @@ $ commandcast exec "echo $HOME" --hosts host1,host2,host3 --user root --keys /ho
 $ commandcast exec "echo $USER" --hostfile /home/jdkanani/clusterhosts
 ```
 
+**Multiple commands**
+
+```bash
+$ commandcast exec -i --hosts node1,node2,node3 --user hadoop
+Keys:  [/Users/jdkanani/.ssh/id_dsa /Users/jdkanani/.ssh/id_rsa]
+Hosts:  [hadoop@node1 hadoop@node2 hadoop@node3]
+>>> echo $HADOOP_HOME
+hadoop@node1 > echo $HADOOP_HOME
+/usr/local/hadoop
+
+hadoop@node2 > echo $HADOOP_HOME
+/usr/local/hadoop
+
+hadoop@node3 > echo $HADOOP_HOME
+/usr/local/hadoop
+
+>>>
+```
+
 ### License
 
 The MIT License (MIT)
