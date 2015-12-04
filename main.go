@@ -51,7 +51,7 @@ func (this *HostConfig) StopSession() {
 func (this *HostConfig) ExecuteCmd(cmd string) string {
 	if this.Session == nil {
 		if _, err := this.StartSession(); err != nil {
-			return hostColor(this.String()+":") + " \n" + err.Error()
+			return fmt.Sprintf("%s > %s\n%s\n", hostColor(this.String()), cmd, err.Error())
 		}
 	}
 
@@ -61,7 +61,7 @@ func (this *HostConfig) ExecuteCmd(cmd string) string {
 
 	result := CleanText(stdoutBuf.String())
 	if result != "" {
-		return hostColor(this.String()+":") + " \n" + result
+		return fmt.Sprintf("%s > %s\n%s\n", hostColor(this.String()), cmd, result)
 	}
 	return ""
 }
