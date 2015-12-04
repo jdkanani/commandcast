@@ -58,8 +58,17 @@ OPTIONS:
 $ commandcast help
 $ commandcast exec --help
 $ commandcast exec "echo ping" --hosts host1,host2,host3
-$ commandcast exec "echo $HOME" --hosts host1,host2,host3 --user root --keys /home/jdkanani/.ssh/cluster_id_rsa
-$ commandcast exec "echo $USER" --hostfile /home/jdkanani/clusterhosts
+$ commandcast exec "echo $HOME" --hosts host1,host2,host3 --user root --keys /Users/jdkanani/.ssh/cluster_id_rsa
+$ commandcast exec "echo $USER" --hostfile /Users/jdkanani/clusterhosts
+```
+
+**Hostfile example**
+
+```
+$ cat /Users/jdkanani/clusterhosts
+node1
+node2
+node3
 ```
 
 **Multiple commands**
