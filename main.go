@@ -59,7 +59,11 @@ func (this *HostConfig) ExecuteCmd(cmd string) string {
 	this.Session.Stdout = &stdoutBuf
 	this.Session.Run(cmd)
 
-	return hostColor(this.String()+":") + " \n" + stdoutBuf.String()
+	result := CleanText(stdoutBuf.String())
+	if result != "" {
+		return hostColor(this.String()+":") + " \n" + result
+	}
+	return ""
 }
 
 // To string
@@ -68,7 +72,7 @@ func (this HostConfig) String() string {
 }
 
 // Clean command - trim space and new line
-func CleanCommand(cmd string) string {
+func CleanText(cmd string) string {
 	return strings.TrimSpace(strings.Trim(cmd, "\n"))
 }
 
@@ -128,7 +132,9 @@ func Execute(cmd string, hosts []HostConfig, to int) {
 	for i := 0; i < len(hosts); i++ {
 		select {
 		case res := <-results:
-			fmt.Println(res)
+			if res != "" {
+				fmt.Println(res)
+			}
 		case <-timeout:
 			color.Red("Timed out!")
 			return
@@ -232,7 +238,7 @@ func main() {
 
 				// single command mode
 				if !interactive {
-					cmd := CleanCommand(c.Args().First())
+					cmd := CleanText(c.Args().First())
 					if cmd != "" {
 						fmt.Printf(">>> %s\n", cmd)
 						Execute(cmd, hostConfigs, to)
@@ -247,7 +253,7 @@ func main() {
 						reader := bufio.NewReader(os.Stdin)
 						fmt.Print(">>> ")
 						cmd, _ := reader.ReadString('\n')
-						cmd = CleanCommand(cmd)
+						cmd = CleanText(cmd)
 
 						if cmd == "exit" {
 							break
