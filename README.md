@@ -1,13 +1,13 @@
 # commandcast
 Run command on multiple hosts over SSH
 
-# Install
+### Install
 
 ```bash
 $ go get github.com/jdkanani/commandcast
 ```
 
-# Usage
+### Usage
 
 ```
 NAME:
@@ -31,7 +31,7 @@ GLOBAL OPTIONS:
    --version, -v	print the version
 ```
 
-# Examples
+### Examples
 
 ```bash
 $ commandcast help
@@ -40,6 +40,6 @@ $ commandcast exec "echo $HOME" --hosts host1,host2,host3 --user root --keys /ho
 $ commandcast exec "echo $USER" --hostfile /home/jdkanani/clusterhosts
 ```
 
-# License
+### License
 
 The MIT License (MIT)
