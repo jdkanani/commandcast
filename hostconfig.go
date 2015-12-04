@@ -10,7 +10,6 @@ import (
 type HostConfig struct {
 	Host         string
 	User         string
-	Password     string
 	Timeout      int
 	ClientConfig *ssh.ClientConfig
 	Session      *ssh.Session

@@ -67,8 +67,9 @@ $ commandcast exec "echo $USER" --hostfile /Users/jdkanani/clusterhosts
 ```
 $ cat /Users/jdkanani/clusterhosts
 node1
-node2
-node3
+admin@node2
+hive:admin@node3
+scoop@node4
 ```
 
 **Multiple commands**

@@ -50,6 +50,10 @@ func PublicKeyFile(file string) ssh.AuthMethod {
 	return ssh.PublicKeys(key)
 }
 
+func GetAuthPassword(password string) []ssh.AuthMethod {
+	return []ssh.AuthMethod{ssh.Password(password)}
+}
+
 func GetAuthKeys(keys []string) []ssh.AuthMethod {
 	methods := []ssh.AuthMethod{}
 
@@ -177,23 +181,22 @@ func main() {
 
 					// client config
 					username := user
-					password := ""
+					keys := authKeys
 					if urlInfo.User != nil {
 						if urlInfo.User.Username() != "" {
 							username = urlInfo.User.Username()
 						}
-						if pass, ok := urlInfo.User.Password(); ok {
-							password = pass
+						if password, ok := urlInfo.User.Password(); ok {
+							keys = GetAuthPassword(password)
 						}
 					}
 
 					// create new host config
 					hostConfigs[i] = HostConfig{
 						User:         username,
-						Password:     password,
 						Host:         urlInfo.Host,
 						Timeout:      to,
-						ClientConfig: &ssh.ClientConfig{User: username, Auth: authKeys},
+						ClientConfig: &ssh.ClientConfig{User: username, Auth: keys},
 					}
 				}
 
@@ -207,8 +210,6 @@ func main() {
 					if cmd != "" {
 						fmt.Printf(">>> %s\n", cmd)
 						Execute(cmd, hostConfigs, to)
-					} else {
-						return
 					}
 				}
 
@@ -228,6 +229,11 @@ func main() {
 							Execute(cmd, hostConfigs, to)
 						}
 					}
+				}
+
+				// Stop host session
+				for _, hostConfig := range hostConfigs {
+					hostConfig.StopSession()
 				}
 			},
 		},
