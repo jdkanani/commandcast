@@ -10,6 +10,8 @@ $ go get github.com/jdkanani/commandcast
 ### Usage
 
 ```
+$ commandcast help
+
 NAME:
    commandcast - Run command on multiple hosts over SSH
 
@@ -31,10 +33,30 @@ GLOBAL OPTIONS:
    --version, -v	print the version
 ```
 
+**Execution usage**
+
+```
+$ commandcast exec --help
+NAME:
+   commandcast exec - Execute command to all hosts
+
+USAGE:
+   commandcast exec [command options] [arguments...]
+
+OPTIONS:
+   --interactive, -i							Enable intereactive mode
+   --hosts "localhost"							Multiple hosts (comma separated)
+   --hostfile 								File containing host names
+   --user, -u 								SSH auth user [$USER]
+   --timeout "15"							SSH timeout (seconds)
+   --keys "/Users/jdkanani/.ssh/id_dsa,/Users/jdkanani/.ssh/id_rsa"	SSH auth keys (comma separated)
+```
+
 ### Examples
 
 ```bash
 $ commandcast help
+$ commandcast exec --help
 $ commandcast exec "echo ping" --hosts host1,host2,host3
 $ commandcast exec "echo $HOME" --hosts host1,host2,host3 --user root --keys /home/jdkanani/.ssh/cluster_id_rsa
 $ commandcast exec "echo $USER" --hostfile /home/jdkanani/clusterhosts

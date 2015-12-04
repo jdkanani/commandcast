@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/codegangsta/cli"
@@ -12,8 +13,64 @@ import (
 	"time"
 )
 
-// Host name color
+// Colors
+var labelColor = color.New(color.FgMagenta).Add(color.Bold).SprintFunc()
 var hostColor = color.New(color.FgCyan).SprintFunc()
+
+// Host configure
+type HostConfig struct {
+	Host         string
+	User         string
+	Timeout      int
+	ClientConfig *ssh.ClientConfig
+	Session      *ssh.Session
+}
+
+// Start SSH session
+func (this *HostConfig) StartSession() (*ssh.Session, error) {
+	conn, err := ssh.Dial("tcp", this.Host+":22", this.ClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	this.Session, err = conn.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	return this.Session, err
+}
+
+// Stop SSH session
+func (this *HostConfig) StopSession() {
+	if this.Session != nil {
+		this.Session.Close()
+	}
+}
+
+// Execute command
+func (this *HostConfig) ExecuteCmd(cmd string) string {
+	if this.Session == nil {
+		if _, err := this.StartSession(); err != nil {
+			return hostColor(this.String()+":") + " \n" + err.Error()
+		}
+	}
+
+	var stdoutBuf bytes.Buffer
+	this.Session.Stdout = &stdoutBuf
+	this.Session.Run(cmd)
+
+	return hostColor(this.String()+":") + " \n" + stdoutBuf.String()
+}
+
+// To string
+func (this HostConfig) String() string {
+	return this.User + "@" + this.Host
+}
+
+// Clean command - trim space and new line
+func CleanCommand(cmd string) string {
+	return strings.TrimSpace(strings.Trim(cmd, "\n"))
+}
 
 func ReadHostsFromFile(file string) []string {
 	buffer, err := ioutil.ReadFile(file)
@@ -56,23 +113,27 @@ func GetAuthKeys(keys []string) []ssh.AuthMethod {
 	return methods
 }
 
-func ExecuteCmd(cmd string, hostname string, config *ssh.ClientConfig) string {
-	conn, err := ssh.Dial("tcp", hostname+":22", config)
-	if err != nil {
-		return hostColor(hostname+": ") + "\n" + err.Error()
+func Execute(cmd string, hosts []HostConfig, to int) {
+	// Run parallel ssh session (max 10)
+	results := make(chan string, 10)
+	timeout := time.After(time.Duration(to) * time.Second)
+
+	// Execute command on hosts
+	for _, host := range hosts {
+		go func(host HostConfig) {
+			results <- host.ExecuteCmd(cmd)
+		}(host)
 	}
 
-	session, err := conn.NewSession()
-	if err != nil {
-		return hostColor(hostname+": ") + "\n" + err.Error()
+	for i := 0; i < len(hosts); i++ {
+		select {
+		case res := <-results:
+			fmt.Println(res)
+		case <-timeout:
+			color.Red("Timed out!")
+			return
+		}
 	}
-	defer session.Close()
-
-	var stdoutBuf bytes.Buffer
-	session.Stdout = &stdoutBuf
-	session.Run(cmd)
-
-	return hostColor(hostname+":") + " \n" + stdoutBuf.String()
 }
 
 func main() {
@@ -85,12 +146,18 @@ func main() {
 
 	var hostString, user, keyString, hostFileName string
 	var to int
+	var interactive bool = false
 	app.Commands = []cli.Command{
 		{
 			Name:    "exec",
 			Aliases: []string{"e"},
 			Usage:   "Execute command to all hosts",
 			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:        "interactive, i",
+					Usage:       "Enable intereactive mode",
+					Destination: &interactive,
+				},
 				cli.StringFlag{
 					Name:        "hosts",
 					Value:       "localhost",
@@ -103,7 +170,7 @@ func main() {
 					Destination: &hostFileName,
 				},
 				cli.StringFlag{
-					Name:        "user",
+					Name:        "user, u",
 					Usage:       "SSH auth user",
 					EnvVar:      "USER",
 					Destination: &user,
@@ -125,7 +192,6 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) {
-				cmd := c.Args().First()
 				keys := strings.Split(keyString, ",")
 
 				var hosts []string = nil
@@ -137,40 +203,59 @@ func main() {
 					hosts = strings.Split(hostString, ",")
 				}
 
-				fmt.Printf("%s %s\n", color.GreenString("Command: "), cmd)
-				fmt.Printf("%s %s\n", color.GreenString("Hosts: "), hosts)
-				fmt.Printf("%s %s\n", color.GreenString("User: "), user)
-				fmt.Printf("%s %s\n", color.GreenString("Keys: "), keys)
-				fmt.Printf("%s \n\n", color.GreenString("Output: "))
-
-				results := make(chan string, 10)
-				timeout := time.After(time.Duration(to) * time.Second)
-
 				authKeys := GetAuthKeys(keys)
 				if len(authKeys) < 1 {
 					color.Red("Key(s) doesn't exist.")
 					return
 				}
 
-				config := &ssh.ClientConfig{
-					User: user,
-					Auth: authKeys,
+				hostConfigs := make([]HostConfig, len(hosts))
+				for i, hostName := range hosts {
+					// client config
+					config := &ssh.ClientConfig{
+						User: user,
+						Auth: authKeys,
+					}
+
+					// create new host config
+					hostConfigs[i] = HostConfig{
+						User:         user,
+						Host:         hostName,
+						Timeout:      to,
+						ClientConfig: config,
+					}
 				}
 
-				// Execute command on hosts
-				for _, hostname := range hosts {
-					go func(hostname string) {
-						results <- ExecuteCmd(cmd, hostname, config)
-					}(hostname)
-				}
+				// Print host configs and keys
+				fmt.Printf("%s %s\n", labelColor("Keys: "), keys)
+				fmt.Printf("%s %+v\n", labelColor("Hosts: "), hostConfigs)
 
-				for i := 0; i < len(hosts); i++ {
-					select {
-					case res := <-results:
-						fmt.Println(res)
-					case <-timeout:
-						color.Red("Timed out!")
+				// single command mode
+				if !interactive {
+					cmd := CleanCommand(c.Args().First())
+					if cmd != "" {
+						fmt.Printf(">>> %s\n", cmd)
+						Execute(cmd, hostConfigs, to)
+					} else {
 						return
+					}
+				}
+
+				// Interactive mode
+				if interactive {
+					for {
+						reader := bufio.NewReader(os.Stdin)
+						fmt.Print(">>> ")
+						cmd, _ := reader.ReadString('\n')
+						cmd = CleanCommand(cmd)
+
+						if cmd == "exit" {
+							break
+						}
+
+						if cmd != "" {
+							Execute(cmd, hostConfigs, to)
+						}
 					}
 				}
 			},
