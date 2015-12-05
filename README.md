@@ -3,6 +3,26 @@ Run command on multiple hosts over SSH
 
 ### Install
 
+**Binaries**
+
+*Mac OSX (darwin-amd64)*
+
+```bash
+$ wget -c https://github.com/jdkanani/commandcast/releases/download/v1.0.0/commandcast-darwin-amd64 -O commandcast
+$ chmod +x commandcast
+$ ./commandcast help
+```
+
+*Linux-amd64*
+
+```bash
+$ wget -c https://github.com/jdkanani/commandcast/releases/download/v1.0.0/commandcast-linux-amd64 -O commandcast
+$ chmod +x commandcast
+$ ./commandcast help
+```
+
+**From source**
+
 ```bash
 $ go get github.com/jdkanani/commandcast
 ```
